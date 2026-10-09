@@ -6,9 +6,24 @@
 *secret*
 *token*
 credentials.json
+.git-credentials
+.netrc
+.npmrc
+.pypirc
+.envrc
+*.env
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
 .ssh/
 .aws/
 .kube/
+.secrets/
+secrets/
+.pi/
 
 # Prevent the agent from choking on massive dependency files
 node_modules/

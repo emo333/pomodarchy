@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "id": "emo333.pomodarchy",
+  "name": "Pomodarchy",
+  "version": "1.0.0",
+  "author": "emo333",
+  "license": "MIT",
+  "repository": "https://github.com/emo333/pomodarchy",
+  "description": "A configurable Pomodoro timer for the Omarchy bar.",
+  "kinds": [
+    "bar-widget",
+    "service"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "barWidget": "BarWidget.qml",
+    "service": "Service.qml"
+  },
+  "barWidget": {
+    "displayName": "Pomodarchy",
+    "description": "A glanceable Pomodoro timer with phase controls.",
+    "category": "Productivity",
+    "defaultSection": "right",
+    "allowMultiple": false,
+    "defaults": {
+      "focusMinutes": 30,
+      "shortBreakMinutes": 5,
+      "longBreakMinutes": 30,
+      "longBreakEvery": 4
+    },
+    "schema": [
+      {
+        "key": "focusMinutes",
+        "type": "integer",
+        "label": "Focus duration (minutes)",
+        "min": 1,
+        "max": 1440,
+        "step": 1,
+        "defaultValue": 30
+      },
+      {
+        "key": "shortBreakMinutes",
+        "type": "integer",
+        "label": "Short break duration (minutes)",
+        "min": 1,
+        "max": 1440,
+        "step": 1,
+        "defaultValue": 5
+      },
+      {
+        "key": "longBreakMinutes",
+        "type": "integer",
+        "label": "Long break duration (minutes)",
+        "min": 1,
+        "max": 1440,
+        "step": 1,
+        "defaultValue": 30
+      },
+      {
+        "key": "longBreakEvery",
+        "type": "integer",
+        "label": "Focus sessions between long breaks",
+        "min": 1,
+        "max": 100,
+        "step": 1,
+        "defaultValue": 4
+      }
+    ]
+  }
+}
