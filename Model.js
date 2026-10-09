@@ -1,12 +1,20 @@
 // Pure Pomodoro state transitions. This file is intentionally plain JavaScript so it
 // can be imported by QML with: import "Model.js" as Model
 
+// Volume ceiling used by the sound backend. 100% maps to 65536 because
+// paplay treats that value as unity gain rather than a distinct step.
+var MAX_VOLUME_ARG = 65536;
+
 function defaultConfig() {
     return {
         focusMinutes: 30,
         shortBreakMinutes: 5,
         longBreakMinutes: 30,
-        longBreakEvery: 4
+        longBreakEvery: 4,
+        soundEnabled: true,
+        focusEndSound: "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga",
+        breakEndSound: "/usr/share/sounds/freedesktop/stereo/bell.oga",
+        soundVolume: 50
     };
 }
 
@@ -14,12 +22,67 @@ function normalizeConfig(config) {
     var defaults = defaultConfig();
     var source = config || {};
 
+    // The key set and its order stay fixed so Service.qml can compare configs
+    // with a plain JSON.stringify.
     return {
         focusMinutes: boundedInteger(source.focusMinutes, defaults.focusMinutes, 1, 1440),
         shortBreakMinutes: boundedInteger(source.shortBreakMinutes, defaults.shortBreakMinutes, 1, 1440),
         longBreakMinutes: boundedInteger(source.longBreakMinutes, defaults.longBreakMinutes, 1, 1440),
-        longBreakEvery: boundedInteger(source.longBreakEvery, defaults.longBreakEvery, 1, 100)
+        longBreakEvery: boundedInteger(source.longBreakEvery, defaults.longBreakEvery, 1, 100),
+        soundEnabled: booleanFlag(source.soundEnabled, defaults.soundEnabled),
+        focusEndSound: soundPath(source.focusEndSound, defaults.focusEndSound),
+        breakEndSound: soundPath(source.breakEndSound, defaults.breakEndSound),
+        soundVolume: boundedInteger(source.soundVolume, defaults.soundVolume, 0, 100)
     };
+}
+
+// Only real booleans and the strings "true"/"false" are honoured; every other
+// value (numbers, junk strings, missing keys) falls back to the default.
+function booleanFlag(value, fallback) {
+    if (typeof value === "boolean") {
+        return value;
+    }
+    if (typeof value === "string") {
+        var text = value.trim().toLowerCase();
+        if (text === "true") {
+            return true;
+        }
+        if (text === "false") {
+            return false;
+        }
+    }
+    return fallback;
+}
+
+// Sound paths are stored verbatim (after trimming); nothing here touches the
+// filesystem, so a missing file is resolved by the player at play time.
+function soundPath(value, fallback) {
+    if (typeof value !== "string") {
+        return fallback;
+    }
+    var text = value.trim();
+    return text === "" ? fallback : text;
+}
+
+// Completion sound for a phase: focus has its own file, both breaks share one.
+function soundPathForPhase(phase, config) {
+    var normalized = normalizeConfig(config);
+    if (phase === "focus") {
+        return normalized.focusEndSound;
+    }
+    return normalized.breakEndSound;
+}
+
+// paplay expects raw PulseAudio volume units, where 65536 is unity gain.
+function paplayVolumeArg(volumePercent) {
+    var defaults = defaultConfig();
+    var numeric = Number(volumePercent);
+    if (volumePercent === null || volumePercent === undefined || volumePercent === "" ||
+            (typeof volumePercent === "string" && volumePercent.replace(/\s/g, "") === "") ||
+            !isFinite(numeric)) {
+        numeric = defaults.soundVolume;
+    }
+    return Math.max(0, Math.min(MAX_VOLUME_ARG, Math.round(numeric / 100 * MAX_VOLUME_ARG)));
 }
 
 function boundedInteger(value, fallback, minimum, maximum) {

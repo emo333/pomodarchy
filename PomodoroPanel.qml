@@ -50,11 +50,41 @@ Item {
     }
     if (!service || typeof service.configure !== "function") return
 
+    root.setSetting(name, Number(root.settingValue(name)) + Number(delta))
+  }
+
+  // Same hostWidget/settings path as adjustSetting, for values that are not
+  // moved by a step (the sound toggle).
+  function setSetting(name, value) {
+    if (hostWidget && typeof hostWidget.setSetting === "function") {
+      hostWidget.setSetting(name, value)
+      return
+    }
+    if (!service || typeof service.configure !== "function") return
+
     var next = {}
     for (var key in timerConfig) next[key] = timerConfig[key]
-    next[name] = Number(next[name]) + Number(delta)
+    next[name] = value
     service.configure(next)
   }
+
+  function toggleSound() {
+    root.setSetting("soundEnabled", root.soundEnabled !== true)
+  }
+
+  function previewSound() {
+    if (service && typeof service.previewSound === "function") {
+      service.previewSound()
+      return
+    }
+    if (hostWidget && typeof hostWidget.previewSound === "function")
+      hostWidget.previewSound()
+  }
+
+  readonly property bool soundEnabled: timerConfig.soundEnabled === true
+  readonly property bool soundMuted: !!(service && service.doNotDisturb)
+  readonly property string soundStatus: !root.soundEnabled
+    ? "Off" : (root.soundMuted ? "Do Not Disturb is on, so phases end silently" : "Plays at the end of a phase")
 
   function settingValue(name) {
     return Number(timerConfig[name]) || 0
@@ -62,6 +92,7 @@ Item {
 
   function settingText(name) {
     if (name === "longBreakEvery") return settingValue(name) + " focus"
+    if (name === "soundVolume") return settingValue(name) + "%"
     return settingValue(name) + " min"
   }
 
@@ -395,6 +426,87 @@ Item {
             verticalPadding: Style.space(2)
             onClicked: root.increment("longBreakEvery", 1)
           }
+        }
+
+        Rectangle {
+          width: parent.width
+          height: 1
+          color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.18)
+        }
+
+        Text {
+          text: "SOUND"
+          color: Qt.darker(root.foreground, 1.35)
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.bodySmall
+          font.letterSpacing: 1
+        }
+
+        Toggle {
+          width: parent.width
+          label: "Completion sound"
+          description: root.soundStatus
+          checked: root.soundEnabled
+          foreground: root.foreground
+          fontFamily: root.fontFamily
+          onClicked: root.toggleSound()
+        }
+
+        Row {
+          width: parent.width
+          height: Style.space(30)
+          spacing: Style.space(4)
+          Text {
+            width: parent.width - Style.space(130)
+            text: "Volume"
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body
+            anchors.verticalCenter: parent.verticalCenter
+          }
+          Button {
+            width: Style.space(28)
+            height: parent.height
+            text: "−"
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            fontSize: Style.font.bodySmall
+            horizontalPadding: Style.space(4)
+            verticalPadding: Style.space(2)
+            onClicked: root.decrement("soundVolume", 5)
+          }
+          Text {
+            width: Style.space(62)
+            text: root.settingText("soundVolume")
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            horizontalAlignment: Text.AlignHCenter
+            anchors.verticalCenter: parent.verticalCenter
+          }
+          Button {
+            width: Style.space(28)
+            height: parent.height
+            text: "+"
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            fontSize: Style.font.bodySmall
+            horizontalPadding: Style.space(4)
+            verticalPadding: Style.space(2)
+            onClicked: root.increment("soundVolume", 5)
+          }
+        }
+
+        Button {
+          width: parent.width
+          text: "Test sound"
+          foreground: root.foreground
+          fontFamily: root.fontFamily
+          focusable: true
+          // Preview obeys the same gates as a real phase completion, so the
+          // button is only live while a sound would actually be heard.
+          enabled: root.service !== null && root.soundEnabled && !root.soundMuted
+          onClicked: root.previewSound()
         }
       }
     }

@@ -26,7 +26,11 @@
       "focusMinutes": 30,
       "shortBreakMinutes": 5,
       "longBreakMinutes": 30,
-      "longBreakEvery": 4
+      "longBreakEvery": 4,
+      "soundEnabled": true,
+      "focusEndSound": "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga",
+      "breakEndSound": "/usr/share/sounds/freedesktop/stereo/bell.oga",
+      "soundVolume": 50
     },
     "schema": [
       {
@@ -64,6 +68,37 @@
         "max": 100,
         "step": 1,
         "defaultValue": 4
+      },
+      {
+        "key": "soundEnabled",
+        "type": "boolean",
+        "label": "Completion sound",
+        "defaultValue": true,
+        "description": "Play a sound when a phase reaches zero. Sound is skipped while Do Not Disturb is detected."
+      },
+      {
+        "key": "focusEndSound",
+        "type": "path",
+        "label": "Focus end sound",
+        "defaultValue": "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga",
+        "description": "Clip played when a focus phase ends. Defaults to alarm-clock-elapsed.oga from the freedesktop sound theme."
+      },
+      {
+        "key": "breakEndSound",
+        "type": "path",
+        "label": "Break end sound",
+        "defaultValue": "/usr/share/sounds/freedesktop/stereo/bell.oga",
+        "description": "Clip played when a short or long break ends. Defaults to bell.oga from the freedesktop sound theme."
+      },
+      {
+        "key": "soundVolume",
+        "type": "integer",
+        "label": "Completion sound volume (%)",
+        "min": 0,
+        "max": 100,
+        "step": 5,
+        "defaultValue": 50,
+        "description": "Playback volume for the end-of-phase clip. 0 is silent and 100 is the stream's normal level."
       }
     ]
   }

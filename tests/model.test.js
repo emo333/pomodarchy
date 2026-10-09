@@ -162,6 +162,119 @@ test('suspend resume starts a fresh running focus without crediting a session', 
   assert.equal(prior.remainingMs, 1, 'suspend resume does not mutate the prior state');
 });
 
+test('defaultConfig ships the completion sound settings', () => {
+  const defaults = Model.defaultConfig();
+  assert.equal(defaults.soundEnabled, true);
+  assert.equal(defaults.focusEndSound, '/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga');
+  assert.equal(defaults.breakEndSound, '/usr/share/sounds/freedesktop/stereo/bell.oga');
+  assert.equal(defaults.soundVolume, 50);
+
+  const normalized = Model.normalizeConfig({});
+  assert.equal(normalized.soundEnabled, true);
+  assert.equal(normalized.focusEndSound, defaults.focusEndSound);
+  assert.equal(normalized.breakEndSound, defaults.breakEndSound);
+  assert.equal(normalized.soundVolume, 50);
+  assert.deepEqual(Object.keys(normalized), Object.keys(defaults), 'config key set stays stable');
+});
+
+test('soundEnabled accepts booleans and true/false strings only', () => {
+  assert.equal(Model.normalizeConfig({ soundEnabled: false }).soundEnabled, false);
+  assert.equal(Model.normalizeConfig({ soundEnabled: true }).soundEnabled, true);
+  assert.equal(Model.normalizeConfig({ soundEnabled: 'false' }).soundEnabled, false);
+  assert.equal(Model.normalizeConfig({ soundEnabled: 'FALSE' }).soundEnabled, false);
+  assert.equal(Model.normalizeConfig({ soundEnabled: ' True ' }).soundEnabled, true);
+
+  for (const junk of ['yes', 'no', '1', '0', '', '   ', 1, 0, null, undefined, {}, []]) {
+    assert.equal(
+      Model.normalizeConfig({ soundEnabled: junk }).soundEnabled,
+      true,
+      `garbage soundEnabled ${JSON.stringify(junk)} falls back to the default`
+    );
+  }
+  assert.equal(Model.normalizeConfig().soundEnabled, true, 'missing config still normalizes');
+});
+
+test('sound paths are trimmed and fall back to the defaults', () => {
+  assert.equal(
+    Model.normalizeConfig({ focusEndSound: '  /tmp/focus.oga  ' }).focusEndSound,
+    '/tmp/focus.oga'
+  );
+  assert.equal(Model.normalizeConfig({ breakEndSound: '\t/tmp/break.wav\n' }).breakEndSound, '/tmp/break.wav');
+
+  const fallbackFocus = '/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga';
+  const fallbackBreak = '/usr/share/sounds/freedesktop/stereo/bell.oga';
+  for (const junk of ['', '   ', '\t\n', 42, true, false, null, undefined, {}, []]) {
+    const normalized = Model.normalizeConfig({ focusEndSound: junk, breakEndSound: junk });
+    assert.equal(normalized.focusEndSound, fallbackFocus);
+    assert.equal(normalized.breakEndSound, fallbackBreak);
+  }
+});
+
+test('soundVolume is rounded and clamped to 0..100', () => {
+  assert.equal(Model.normalizeConfig({ soundVolume: 0 }).soundVolume, 0);
+  assert.equal(Model.normalizeConfig({ soundVolume: 50 }).soundVolume, 50);
+  assert.equal(Model.normalizeConfig({ soundVolume: 100 }).soundVolume, 100);
+  assert.equal(Model.normalizeConfig({ soundVolume: -25 }).soundVolume, 0);
+  assert.equal(Model.normalizeConfig({ soundVolume: 250 }).soundVolume, 100);
+  assert.equal(Model.normalizeConfig({ soundVolume: '75' }).soundVolume, 75);
+  assert.equal(Model.normalizeConfig({ soundVolume: 'loud' }).soundVolume, 50);
+  assert.equal(Model.normalizeConfig({ soundVolume: 49.4 }).soundVolume, 49, 'fractions round, not truncate');
+  assert.equal(Model.normalizeConfig({ soundVolume: 49.5 }).soundVolume, 50);
+});
+
+test('soundPathForPhase maps focus and both break phases', () => {
+  const config = {
+    focusEndSound: '/tmp/focus.oga',
+    breakEndSound: '/tmp/break.oga',
+  };
+  assert.equal(Model.soundPathForPhase('focus', config), '/tmp/focus.oga');
+  assert.equal(Model.soundPathForPhase('shortBreak', config), '/tmp/break.oga');
+  assert.equal(Model.soundPathForPhase('longBreak', config), '/tmp/break.oga');
+
+  const defaults = Model.defaultConfig();
+  assert.equal(Model.soundPathForPhase('focus'), defaults.focusEndSound);
+  assert.equal(Model.soundPathForPhase('shortBreak'), defaults.breakEndSound);
+  assert.equal(Model.soundPathForPhase('longBreak'), defaults.breakEndSound);
+});
+
+test('paplayVolumeArg converts percent to pulse units', () => {
+  assert.equal(Model.paplayVolumeArg(0), 0);
+  assert.equal(Model.paplayVolumeArg(50), 32768);
+  assert.equal(Model.paplayVolumeArg(100), 65536);
+  assert.equal(Model.paplayVolumeArg(200), 65536, 'above range clamps to unity gain');
+  assert.equal(Model.paplayVolumeArg(-10), 0, 'below range clamps to silence');
+  assert.equal(Model.paplayVolumeArg('50'), 32768);
+  assert.equal(Model.paplayVolumeArg(25), 16384);
+  assert.equal(Model.paplayVolumeArg(33), Math.round(0.33 * 65536));
+  assert.equal(Model.paplayVolumeArg(49.4), Math.round(0.494 * 65536), 'fractional percent scales continuously');
+  assert.equal(Model.paplayVolumeArg(49.5), Math.round(0.495 * 65536));
+  assert.equal(Model.paplayVolumeArg('loud'), 32768, 'garbage falls back to the default volume');
+  assert.equal(Model.paplayVolumeArg(null), 32768);
+  assert.equal(Model.paplayVolumeArg(undefined), 32768);
+  assert.equal(Model.paplayVolumeArg(Number.NaN), 32768);
+});
+
+test('sound settings do not disturb phase transitions', () => {
+  const noisy = { ...config, soundEnabled: false, focusEndSound: '/tmp/f.oga', soundVolume: 0 };
+  const initial = Model.createState(noisy);
+  assert.equal(initial.remainingMs, 25 * minute);
+
+  const awaiting = Model.tick(Model.start(initial, 0), 25 * minute);
+  assert.equal(awaiting.status, 'awaiting');
+  const next = Model.acknowledge(awaiting, 25 * minute, noisy);
+  assert.equal(next.phase, 'shortBreak');
+  assert.equal(next.remainingMs, 6 * minute);
+  assert.equal(Model.durationMs('focus', noisy), 25 * minute);
+  assert.equal(Model.durationMs('longBreak', noisy), 31 * minute);
+  assert.equal(
+    Model.soundPathForPhase(next.phase, noisy),
+    '/usr/share/sounds/freedesktop/stereo/bell.oga',
+    'breakEndSound was not overridden, so breaks use the default file'
+  );
+  assert.equal(Model.soundPathForPhase('focus', noisy), '/tmp/f.oga');
+  assert.equal(Model.paplayVolumeArg(Model.normalizeConfig(noisy).soundVolume), 0);
+});
+
 test('longBreakEvery is rounded and bounded', () => {
   const startState = Model.createState({ ...config, longBreakEvery: 0 });
   assert.equal(startState.completedFocusSessions, 0);
