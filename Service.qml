@@ -192,6 +192,30 @@ QtObject {
     root.playSound(Model.soundPathForPhase(phase, root.config))
   }
 
+  // Model defaults are relative to the plugin. Resolve them against this QML
+  // file, while keeping user-selected absolute paths intact. Convert the
+  // resolved QML URL (including file URLs from path choosers) to a local path.
+  function resolveSoundPath(path) {
+    var value = String(path || "").trim()
+    if (value === "") return ""
+    if (value.charAt(0) === "/") return value
+
+    var resolved
+    try {
+      resolved = new URL(String(Qt.resolvedUrl(value)))
+    } catch (error) {
+      return ""
+    }
+    if (resolved.protocol !== "file:" ||
+        (resolved.hostname !== "" && resolved.hostname !== "localhost")) return ""
+
+    try {
+      return decodeURIComponent(resolved.pathname)
+    } catch (error) {
+      return ""
+    }
+  }
+
   // Manual "Test sound": the same gates as a real completion, so a custom
   // path is verified exactly as it will behave in production.
   function previewSound() {
@@ -199,7 +223,7 @@ QtObject {
   }
 
   function playSound(path) {
-    var target = String(path || "")
+    var target = root.resolveSoundPath(path)
     if (target === "") return
 
     var config = Model.normalizeConfig(root.config)

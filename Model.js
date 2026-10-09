@@ -12,8 +12,8 @@ function defaultConfig() {
         longBreakMinutes: 30,
         longBreakEvery: 4,
         soundEnabled: true,
-        focusEndSound: "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga",
-        breakEndSound: "/usr/share/sounds/freedesktop/stereo/bell.oga",
+        focusEndSound: "assets/focus-complete.wav",
+        breakEndSound: "assets/break-complete.wav",
         soundVolume: 50
     };
 }

@@ -4,7 +4,7 @@ Pomodarchy is a configurable Pomodoro timer for the Omarchy bar. `BarWidget.qml`
 
 ## Install
 
-The GitHub repository `emo333/pomodarchy` has not been created yet. These install commands will work once the plugin has been published there.
+The plugin repository is hosted at [github.com/emo333/pomodarchy](https://github.com/emo333/pomodarchy).
 
 On Omarchy, add the Git repository and enable the plugin:
 
@@ -42,9 +42,11 @@ After validation and review, install the folder and enable it:
 
 ```bash
 mkdir -p ~/.config/omarchy/plugins
-install -d ~/.config/omarchy/plugins/emo333.pomodarchy
+install -d ~/.config/omarchy/plugins/emo333.pomodarchy/assets
 install -m644 manifest.json BarWidget.qml PomodoroPanel.qml Service.qml Model.js LICENSE.md README.md \
   ~/.config/omarchy/plugins/emo333.pomodarchy/
+install -m644 assets/focus-complete.wav assets/break-complete.wav \
+  ~/.config/omarchy/plugins/emo333.pomodarchy/assets/
 omarchy-shell shell rescanPlugins
 # Wait until `omarchy plugin list` shows emo333.pomodarchy, then enable it.
 omarchy plugin enable emo333.pomodarchy --section right
@@ -63,8 +65,8 @@ The default configuration is:
 | Long break | 30 minutes |
 | Focus sessions before a long break | 4 |
 | Completion sound | on |
-| Focus end sound | `/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga` |
-| Break end sound | `/usr/share/sounds/freedesktop/stereo/bell.oga` |
+| Focus end sound | `assets/focus-complete.wav` (short rising C5→G5 chime) |
+| Break end sound | `assets/break-complete.wav` (softer descending A4→F4 chime) |
 | Completion sound volume | 50% |
 
 The repeating cycle is focus → short break → focus, with a long break after every fourth completed focus session. A phase that reaches zero waits for acknowledgment; acknowledging it starts the next phase. A configured long break replaces the short break after the fourth, eighth, and subsequent fourth completed focus sessions. Skipping a running or paused focus phase does not count it as completed; skipping a focus phase that has already reached zero does count it.
@@ -89,7 +91,7 @@ Durations accept integer minutes from 1 to 1440; `longBreakEvery` accepts an int
 
 ## Completion sound
 
-When a phase reaches zero the plugin plays a completion clip and sends one desktop notification. The clip depends on the phase type: a focus phase uses `focusEndSound`, and both short and long breaks use `breakEndSound`. By default those are two different files from the freedesktop sound theme (`alarm-clock-elapsed.oga` for focus, `bell.oga` for breaks).
+When a phase reaches zero the plugin plays a completion clip and sends one desktop notification. The clip depends on the phase type: a focus phase uses `focusEndSound`, and both short and long breaks use `breakEndSound`. By default focus uses the included short, rising C5→G5 chime; breaks use the softer, descending A4→F4 chime. Both are bundled original project audio assets.
 
 The sound plays exactly once per completed phase and never repeats, matching the single notification. A sound that fails to play is ignored: a missing file, an unreachable audio server, or a missing `paplay` binary produces no output and no error, and never affects the timer, the notification, or the popup.
 
@@ -98,8 +100,8 @@ Four settings control it:
 | Setting | Type | Default |
 | --- | --- | --- |
 | `soundEnabled` | boolean | `true` |
-| `focusEndSound` | path | `/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga` |
-| `breakEndSound` | path | `/usr/share/sounds/freedesktop/stereo/bell.oga` |
+| `focusEndSound` | path | `assets/focus-complete.wav` |
+| `breakEndSound` | path | `assets/break-complete.wav` |
 | `soundVolume` | integer 0–100, step 5 | `50` |
 
 In the popup, a **Completion sound** toggle switches sound on and off, and a **Volume** row moves in 5% steps. **Test sound** plays the focus-end clip through exactly the same gates as a real completion, so the button is disabled while sound is off or Do Not Disturb is on; it always previews the focus clip, not the break clip. The popup has no control for the two clip paths, so set them through the bar settings or from a terminal:
@@ -111,7 +113,7 @@ omarchy bar set emo333.pomodarchy focusEndSound /home/you/Sounds/chime.oga
 omarchy bar set emo333.pomodarchy breakEndSound /home/you/Sounds/done.oga
 ```
 
-Only non-default values are written into `shell.json`. The defaults include absolute paths to system sound files, so persisting them would bake this machine's file layout into your config and a single duration tweak would rewrite them. A value that returns to its default disappears from the config entry again.
+Only non-default values are written into `shell.json`. The defaults use paths relative to the plugin, so persisting them would be redundant and a single duration tweak would rewrite them. A value that returns to its default disappears from the config entry again.
 
 ### Do Not Disturb
 
@@ -127,9 +129,17 @@ This is a **best-effort check, not an integration with the notifications service
 
 ### Playback backend
 
-Playback uses `paplay`, the PulseAudio client (`libpulse` on Arch, which talks to `pipewire-pulse`), with `soundVolume` converted from a percentage to PulseAudio volume units (100% is 65536, the unity gain value). Whether `paplay` exists is probed **once per shell session**, lazily, on the first sound request; the result is then cached for the rest of that session. Installing `paplay` while the shell is running therefore needs an `omarchy-restart-shell` to be picked up.
+Playback uses `paplay`, the PulseAudio client (`libpulse` on Arch, which talks to `pipewire-pulse`), with `soundVolume` converted from a percentage to PulseAudio volume units. `soundVolume` 100 maps to 65536, paplay's unity gain; the system output volume still affects perceived loudness. Whether `paplay` exists is probed **once per shell session**, lazily, on the first sound request; the result is then cached for the rest of that session. Installing `paplay` while the shell is running therefore needs an `omarchy-restart-shell` to be picked up.
 
-The default clips ship with the freedesktop sound theme (`sound-theme-freedesktop`). On a system without that package the default paths do not exist, nothing plays, and no error is shown — point `focusEndSound` and `breakEndSound` at your own files, or install the theme.
+### Bundled original chimes
+
+The focus and break WAVs are original project assets, generated without third-party samples and released under this repository's MIT license. The generator uses only the Python standard library; Python is needed only to regenerate the assets, not at runtime. From the repository root, regenerate both files with:
+
+```bash
+python tools/generate_chimes.py
+```
+
+The bundled WAVs are included with the plugin, so no sound-theme package is required. Users may choose other audio files through `focusEndSound` and `breakEndSound`.
 
 ## IPC
 
@@ -169,7 +179,7 @@ The behavior and scope are explicitly:
 
 ## Dependencies and security
 
-The service depends on `dbus-monitor` to detect suspend/resume, `busctl` to recover the current sleep state if the monitor restarts, `notify-send` to send phase-completion notifications, and `paplay` (the PulseAudio client from `libpulse`, talking to `pipewire-pulse`) to play completion sounds. These commands must be available in `PATH`; notifications also depend on a working desktop notification service, and sound additionally needs a reachable audio server. The default clips come with the freedesktop sound theme (`sound-theme-freedesktop`), so a system without it needs custom `focusEndSound`/`breakEndSound` paths. The shared timer service requires the built-in Omarchy bar's own-plugin service API; third-party replacement bars that expose a service-less API are not supported.
+The service depends on `dbus-monitor` to detect suspend/resume, `busctl` to recover the current sleep state if the monitor restarts, `notify-send` to send phase-completion notifications, and `paplay` (the PulseAudio client from `libpulse`, talking to `pipewire-pulse`) to play completion sounds. These commands must be available in `PATH`; notifications also depend on a working desktop notification service, and sound additionally needs a reachable audio server. The original WAV chimes are bundled with the plugin; no sound-theme package is required. The shared timer service requires the built-in Omarchy bar's own-plugin service API; third-party replacement bars that expose a service-less API are not supported.
 
 **Omarchy plugins are unsandboxed.** Plugin QML and JavaScript run inside the long-lived `omarchy-shell` process and can run with your user permissions; installing a plugin is not an isolation boundary. Review all shipped code—including process invocation and file access—before installing or enabling it. Omarchy validation checks manifest requirements, safe relative entrypoints, and file presence, and rejects symlinks in the plugin source tree (excluding `.git`). It is not a code or runtime security audit and does not validate QML syntax.
 

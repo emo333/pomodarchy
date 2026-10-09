@@ -28,8 +28,8 @@
       "longBreakMinutes": 30,
       "longBreakEvery": 4,
       "soundEnabled": true,
-      "focusEndSound": "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga",
-      "breakEndSound": "/usr/share/sounds/freedesktop/stereo/bell.oga",
+      "focusEndSound": "assets/focus-complete.wav",
+      "breakEndSound": "assets/break-complete.wav",
       "soundVolume": 50
     },
     "schema": [
@@ -80,15 +80,15 @@
         "key": "focusEndSound",
         "type": "path",
         "label": "Focus end sound",
-        "defaultValue": "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga",
-        "description": "Clip played when a focus phase ends. Defaults to alarm-clock-elapsed.oga from the freedesktop sound theme."
+        "defaultValue": "assets/focus-complete.wav",
+        "description": "Clip played when a focus phase ends. Uses the included original focus chime by default; users may choose another audio file."
       },
       {
         "key": "breakEndSound",
         "type": "path",
         "label": "Break end sound",
-        "defaultValue": "/usr/share/sounds/freedesktop/stereo/bell.oga",
-        "description": "Clip played when a short or long break ends. Defaults to bell.oga from the freedesktop sound theme."
+        "defaultValue": "assets/break-complete.wav",
+        "description": "Clip played when a short or long break ends. Uses the included original break chime by default; users may choose another audio file."
       },
       {
         "key": "soundVolume",

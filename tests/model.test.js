@@ -165,8 +165,8 @@ test('suspend resume starts a fresh running focus without crediting a session', 
 test('defaultConfig ships the completion sound settings', () => {
   const defaults = Model.defaultConfig();
   assert.equal(defaults.soundEnabled, true);
-  assert.equal(defaults.focusEndSound, '/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga');
-  assert.equal(defaults.breakEndSound, '/usr/share/sounds/freedesktop/stereo/bell.oga');
+  assert.equal(defaults.focusEndSound, 'assets/focus-complete.wav');
+  assert.equal(defaults.breakEndSound, 'assets/break-complete.wav');
   assert.equal(defaults.soundVolume, 50);
 
   const normalized = Model.normalizeConfig({});
@@ -175,6 +175,33 @@ test('defaultConfig ships the completion sound settings', () => {
   assert.equal(normalized.breakEndSound, defaults.breakEndSound);
   assert.equal(normalized.soundVolume, 50);
   assert.deepEqual(Object.keys(normalized), Object.keys(defaults), 'config key set stays stable');
+});
+
+test('default sound paths are plugin-relative bundled assets', () => {
+  const defaults = Model.defaultConfig();
+  const bundled = {
+    focusEndSound: 'assets/focus-complete.wav',
+    breakEndSound: 'assets/break-complete.wav',
+  };
+  assert.equal(defaults.focusEndSound, bundled.focusEndSound);
+  assert.equal(defaults.breakEndSound, bundled.breakEndSound);
+
+  for (const key of Object.keys(bundled)) {
+    assert.ok(!path.isAbsolute(defaults[key]), `${key} is relative, not absolute`);
+    assert.ok(!defaults[key].startsWith('/'), `${key} does not start with a slash`);
+    assert.ok(!defaults[key].split('/').includes('..'), `${key} does not escape the plugin directory`);
+    assert.ok(defaults[key].startsWith('assets/'), `${key} lives in the assets directory`);
+    assert.ok(
+      fs.existsSync(path.join(__dirname, '..', defaults[key])),
+      `${key} default ${defaults[key]} exists in the repository`
+    );
+  }
+
+  const normalized = Model.normalizeConfig({});
+  assert.equal(normalized.focusEndSound, bundled.focusEndSound);
+  assert.equal(normalized.breakEndSound, bundled.breakEndSound);
+  assert.equal(Model.soundPathForPhase('focus'), bundled.focusEndSound);
+  assert.equal(Model.soundPathForPhase('longBreak'), bundled.breakEndSound);
 });
 
 test('soundEnabled accepts booleans and true/false strings only', () => {
@@ -201,8 +228,8 @@ test('sound paths are trimmed and fall back to the defaults', () => {
   );
   assert.equal(Model.normalizeConfig({ breakEndSound: '\t/tmp/break.wav\n' }).breakEndSound, '/tmp/break.wav');
 
-  const fallbackFocus = '/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga';
-  const fallbackBreak = '/usr/share/sounds/freedesktop/stereo/bell.oga';
+  const fallbackFocus = 'assets/focus-complete.wav';
+  const fallbackBreak = 'assets/break-complete.wav';
   for (const junk of ['', '   ', '\t\n', 42, true, false, null, undefined, {}, []]) {
     const normalized = Model.normalizeConfig({ focusEndSound: junk, breakEndSound: junk });
     assert.equal(normalized.focusEndSound, fallbackFocus);
@@ -268,7 +295,7 @@ test('sound settings do not disturb phase transitions', () => {
   assert.equal(Model.durationMs('longBreak', noisy), 31 * minute);
   assert.equal(
     Model.soundPathForPhase(next.phase, noisy),
-    '/usr/share/sounds/freedesktop/stereo/bell.oga',
+    'assets/break-complete.wav',
     'breakEndSound was not overridden, so breaks use the default file'
   );
   assert.equal(Model.soundPathForPhase('focus', noisy), '/tmp/f.oga');
