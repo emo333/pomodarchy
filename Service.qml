@@ -6,6 +6,8 @@ import "Model.js" as Model
 QtObject {
   id: root
 
+  property bool completionAttention: false
+
   // Injected by Omarchy's third-party plugin service loader.
   property var shell: null
 
@@ -88,12 +90,11 @@ QtObject {
     var previousState = root.state
     root.state = nextState
     root.now = timestamp
+    if (!nextState || nextState.status !== "awaiting") root.completionAttention = false
 
     if (previousState && previousState.status === "running" &&
         nextState && nextState.status === "awaiting") {
-      root.notifyExpiry(previousState.phase)
-      // Independent of the notification above: a sound that cannot play is
-      // not an error, and must not disturb either the toast or the timer.
+      root.completionAttention = true
       root.playPhaseSound(previousState.phase)
     }
   }
@@ -300,16 +301,6 @@ QtObject {
     }
   }
 
-  function notifyExpiry(phase) {
-    var phaseName = labelForPhase(phase)
-    notificationProcess.command = [
-      "notify-send",
-      "--app-name=Pomodarchy",
-      phaseName + " complete",
-      "Acknowledge to start the next phase."
-    ]
-    notificationProcess.running = true
-  }
 
   function setSuspended(value) {
     if (value) {
@@ -388,7 +379,6 @@ QtObject {
     onTriggered: root.tick()
   }
 
-  property Process notificationProcess: Process {}
 
   // Probed once per session instead of being spawned blindly: without this a
   // missing paplay prints "Process failed to start" from Quickshell on every

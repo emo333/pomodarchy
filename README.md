@@ -45,7 +45,7 @@ mkdir -p ~/.config/omarchy/plugins
 install -d ~/.config/omarchy/plugins/emo333.pomodarchy/assets
 install -m644 manifest.json BarWidget.qml PomodoroPanel.qml Service.qml Model.js LICENSE.md README.md \
   ~/.config/omarchy/plugins/emo333.pomodarchy/
-install -m644 assets/focus-complete.wav assets/break-complete.wav \
+install -m644 assets/focus-complete.wav assets/break-complete.wav assets/tomato.svg \
   ~/.config/omarchy/plugins/emo333.pomodarchy/assets/
 omarchy-shell shell rescanPlugins
 # Wait until `omarchy plugin list` shows emo333.pomodarchy, then enable it.
@@ -71,7 +71,7 @@ The default configuration is:
 
 The repeating cycle is focus → short break → focus, with a long break after every fourth completed focus session. A phase that reaches zero waits for acknowledgment; acknowledging it starts the next phase. A configured long break replaces the short break after the fourth, eighth, and subsequent fourth completed focus sessions. Skipping a running or paused focus phase does not count it as completed; skipping a focus phase that has already reached zero does count it.
 
-The widget displays a phase indicator and remaining time in `MM:SS` format (the minute field can exceed two digits for long durations). Click the bar widget to open its panel. The panel controls are:
+The widget displays a phase indicator and remaining time in `MM:SS` format (the minute field can exceed two digits for long durations). At completion it shows **TAKE A BREAK** after focus, or **START FOCUSING** after a break, with a blinking rounded pill and tomato SVG. The text stays readable during the blink-off interval. Opening or closing the popup clears the highlight but leaves the completion message and timer awaiting acknowledgment. No desktop notification is sent. Click the bar widget to open its panel. The panel controls are:
 
 - **Start / Pause / Resume** — start an idle timer, pause a running timer, or resume a paused timer.
 - **Acknowledge & continue** — after a phase ends, acknowledge it and start the next phase.
@@ -79,6 +79,8 @@ The widget displays a phase indicator and remaining time in `MM:SS` format (the 
 - **Restart** — restart the current phase at its full configured duration.
 - **Completion sound** — toggle the end-of-phase clip, set its volume in 5% steps, and preview the focus clip with **Test sound**. See [Completion sound](#completion-sound).
 - **More actions** — reveals Skip and Restart.
+
+**Acknowledge & continue**, **Pause**, **Skip**, and **Restart** close the popup after performing their action. **Start** and **Resume** leave it open.
 
 All eight settings are declared in the manifest schema that Omarchy's bar settings read, so any of them can be set from a terminal with `omarchy bar set`. The durations, the sound toggle, and the volume also have controls in the popup; the two clip paths have no popup control:
 
@@ -91,9 +93,9 @@ Durations accept integer minutes from 1 to 1440; `longBreakEvery` accepts an int
 
 ## Completion sound
 
-When a phase reaches zero the plugin plays a completion clip and sends one desktop notification. The clip depends on the phase type: a focus phase uses `focusEndSound`, and both short and long breaks use `breakEndSound`. By default focus uses the included short, rising C5→G5 chime; breaks use the softer, descending A4→F4 chime. Both are bundled original project audio assets.
+When a phase reaches zero the plugin plays a completion clip and highlights the bar widget. The clip depends on the phase type: a focus phase uses `focusEndSound`, and both short and long breaks use `breakEndSound`. By default focus uses the included short, rising C5→G5 chime; breaks use the softer, descending A4→F4 chime. Both are bundled original project audio assets.
 
-The sound plays exactly once per completed phase and never repeats, matching the single notification. A sound that fails to play is ignored: a missing file, an unreachable audio server, or a missing `paplay` binary produces no output and no error, and never affects the timer, the notification, or the popup.
+The sound plays exactly once per completed phase and never repeats. A sound that fails to play is ignored: a missing file, an unreachable audio server, or a missing `paplay` binary produces no output and no error, and never affects the timer, the bar highlight, or the popup.
 
 Four settings control it:
 
@@ -123,7 +125,7 @@ This is a **best-effort check, not an integration with the notifications service
 
 - Only a parseable `dnd: true` (or the string `"true"`) suppresses the sound.
 - A missing file (a fresh install), an unreadable one, malformed JSON, or any other `dnd` value resolves to "not muted", so the sound plays. The plugin never blocks its own sound on a value it could not read.
-- The sound does not bypass Do Not Disturb: when `dnd` is true the clip is suppressed, exactly like the notification.
+- The sound does not bypass Do Not Disturb: when `dnd` is true the clip is suppressed. The bar completion message and highlight remain available.
 - A notification daemon other than Omarchy's keeps its Do Not Disturb state somewhere else — mako, dunst, and friends write no `notifications.json` — so such setups are simply not detected and the sound still plays.
 - The plugin only ever reads this file; it never writes to it.
 
@@ -172,14 +174,14 @@ Timer state is held in memory, not saved to disk. Restarting the Omarchy shell o
 
 The behavior and scope are explicitly:
 
-- **One alert per phase:** phase completion plays a single completion clip (a distinct file for focus versus breaks) and sends one desktop notification. Neither repeats. The sound is suppressed while Do Not Disturb is detected, using the best-effort check described above; the notification still goes through the desktop service, which applies its own Do Not Disturb behavior.
+- **Completion alert:** phase completion plays a single completion clip (a distinct file for focus versus breaks) and blinks the bar highlight until the popup opens or closes. The sound does not repeat and is suppressed while Do Not Disturb is detected, using the best-effort check described above. No desktop notification is sent.
 - **Idle and activity are independent:** idle time, lock state, active application, and workspace do not automatically pause or resume the timer.
 - **No history:** session progress is runtime state only; no persistent history, reports, or streaks are kept.
 - **Compact display:** show the phase indicator and `MM:SS` countdown.
 
 ## Dependencies and security
 
-The service depends on `dbus-monitor` to detect suspend/resume, `busctl` to recover the current sleep state if the monitor restarts, `notify-send` to send phase-completion notifications, and `paplay` (the PulseAudio client from `libpulse`, talking to `pipewire-pulse`) to play completion sounds. These commands must be available in `PATH`; notifications also depend on a working desktop notification service, and sound additionally needs a reachable audio server. The original WAV chimes are bundled with the plugin; no sound-theme package is required. The shared timer service requires the built-in Omarchy bar's own-plugin service API; third-party replacement bars that expose a service-less API are not supported.
+The service depends on `dbus-monitor` to detect suspend/resume, `busctl` to recover the current sleep state if the monitor restarts, and `paplay` (the PulseAudio client from `libpulse`, talking to `pipewire-pulse`) to play completion sounds. These commands must be available in `PATH`; sound additionally needs a reachable audio server. The original WAV chimes and tomato SVG are bundled with the plugin; no sound-theme package or desktop notification daemon is required for completion alerts. The shared timer service requires the built-in Omarchy bar's own-plugin service API; third-party replacement bars that expose a service-less API are not supported.
 
 **Omarchy plugins are unsandboxed.** Plugin QML and JavaScript run inside the long-lived `omarchy-shell` process and can run with your user permissions; installing a plugin is not an isolation boundary. Review all shipped code—including process invocation and file access—before installing or enabling it. Omarchy validation checks manifest requirements, safe relative entrypoints, and file presence, and rejects symlinks in the plugin source tree (excluding `.git`). It is not a code or runtime security audit and does not validate QML syntax.
 

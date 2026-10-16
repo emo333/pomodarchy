@@ -14,7 +14,10 @@ Item {
   property bool popoutSwitchClosing: false
   property bool secondaryMenuOpen: false
 
-  onPopupOpenChanged: if (!popupOpen) secondaryMenuOpen = false
+  onPopupOpenChanged: {
+    if (!popupOpen) secondaryMenuOpen = false
+    if (service) service.completionAttention = false
+  }
 
   readonly property bool opened: popupOpen
   readonly property color foreground: bar ? bar.foreground : Color.foreground
@@ -182,7 +185,10 @@ Item {
           focusable: true
           onClicked: {
             if (!root.service) return
-            if (root.timerState.status === "running") root.service.pause()
+            if (root.timerState.status === "running") {
+              root.service.pause()
+              root.close()
+            }
             else root.service.resume()
           }
         }
@@ -196,7 +202,11 @@ Item {
           fontFamily: root.fontFamily
           selected: true
           focusable: true
-          onClicked: if (root.service) root.service.acknowledge()
+          onClicked: {
+            if (!root.service) return
+            root.service.acknowledge()
+            root.close()
+          }
         }
 
         Button {
@@ -220,7 +230,11 @@ Item {
             fontFamily: root.fontFamily
             focusable: true
             enabled: root.service !== null
-            onClicked: if (root.service) root.service.skip()
+            onClicked: {
+              if (!root.service) return
+              root.service.skip()
+              root.close()
+            }
           }
 
           Button {
@@ -230,7 +244,11 @@ Item {
             fontFamily: root.fontFamily
             focusable: true
             enabled: root.service !== null
-            onClicked: if (root.service) root.service.restart()
+            onClicked: {
+              if (!root.service) return
+              root.service.restart()
+              root.close()
+            }
           }
         }
 

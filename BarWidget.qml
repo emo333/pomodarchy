@@ -13,6 +13,18 @@ BarWidget {
     if (!pluginShell || typeof pluginShell.serviceFor !== "function") return null
     return pluginShell.serviceFor(root.moduleName)
   }
+
+  readonly property bool completionAttention: !!timerService && timerService.completionAttention
+  property bool blinkOn: true
+
+  Timer {
+    interval: 600
+    repeat: true
+    running: root.completionAttention
+    onRunningChanged: root.blinkOn = true
+    onTriggered: root.blinkOn = !root.blinkOn
+  }
+
   readonly property string phaseAbbreviation: {
     if (!timerService || !timerService.state) return "F"
     if (timerService.state.phase === "shortBreak") return "SB"
@@ -20,6 +32,8 @@ BarWidget {
     return "F"
   }
   readonly property string barText: {
+    if (timerService && timerService.state && timerService.state.status === "awaiting")
+      return timerService.state.phase === "focus" ? "TAKE A BREAK" : "START FOCUSING"
     var time = timerService ? timerService.remainingText : "30:00"
     if (vertical) return phaseAbbreviation + " " + time
     var phase = timerService ? timerService.phaseLabel.toUpperCase() : "FOCUS"
@@ -173,16 +187,56 @@ BarWidget {
     anchors.fill: parent
     bar: root.bar
     text: root.barText
+    labelVisible: !root.completionAttention
+    fixedWidth: !root.vertical && root.completionAttention
+      ? completionContent.implicitWidth + Style.space(24) : -1
     tooltipText: root.timerService
       ? "Pomodoro " + root.timerService.phaseLabel + " · " + root.timerService.statusLabel
       : "Pomodoro timer"
     active: root.timerService && root.timerService.state
-      ? root.timerService.state.status === "running" || root.timerService.state.status === "awaiting"
-      : false
+      ? root.timerService.state.status === "running" : false
+    foreground: root.completionAttention && root.blinkOn
+      ? (root.bar ? root.bar.background : Color.background)
+      : (root.bar ? root.bar.barForeground : Color.foreground)
+    Rectangle {
+      anchors.fill: parent
+      anchors.margins: Style.space(3)
+      radius: Math.min(width, height) / 2
+      z: -1
+      visible: root.completionAttention && root.blinkOn
+      color: root.bar ? root.bar.barForeground : Color.foreground
+    }
+    Row {
+      id: completionContent
+      anchors.centerIn: parent
+      visible: root.completionAttention
+      spacing: Style.space(6)
+      rotation: root.vertical ? -90 : 0
+
+      Image {
+        anchors.verticalCenter: parent.verticalCenter
+        source: Qt.resolvedUrl("assets/tomato.svg")
+        sourceSize.width: width
+        sourceSize.height: height
+        width: Style.space(18)
+        height: width
+        opacity: root.blinkOn ? 1 : 0
+      }
+      Text {
+        text: root.barText
+        color: button.foreground
+        font.family: button.fontFamily
+        font.pixelSize: button.fontSize
+        textFormat: Text.PlainText
+        renderType: Text.NativeRendering
+      }
+    }
     horizontalMargin: 7
     verticalPadding: 6
     textRotation: root.vertical ? -90 : 0
-    fixedHeight: root.vertical ? Math.max(Style.bar.iconSlot, labelWidth + Style.space(12)) : -1
+    fixedHeight: root.vertical
+      ? Math.max(Style.bar.iconSlot, root.completionAttention
+        ? completionContent.implicitWidth + Style.space(24) : labelWidth + Style.space(12)) : -1
 
     onPressed: function(mouseButton) {
       if (mouseButton === Qt.LeftButton) root.togglePanel()
